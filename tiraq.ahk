@@ -72,7 +72,8 @@ ColorMatch(color1, color2, tolerance) {
     return (Abs(r1 - r2) <= tolerance) && (Abs(g1 - g2) <= tolerance) && (Abs(b1 - b2) <= tolerance)
 }
 
-; Exit script with F2
+; Exit script with F10
 F10:: {
     ExitApp
 }
+
