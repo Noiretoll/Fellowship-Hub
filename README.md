@@ -5,5 +5,4 @@ Note: AutoHotKey 2.0+ required
 ### Display Settings
 **Resolution:** 2560x1440  
 **Window:** Borderless  
-**Graphics:** "Epic" Preset  
 **Resolution Scale:** 100  
