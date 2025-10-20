@@ -9,19 +9,19 @@ CoordMode "Pixel", "Screen"
 gameProcess := "fellowship-Win64-Shipping.exe"
 
 ; Finisher icon coordinates
-finisherX := 1130
-finisherY := 1122
+finisherX := 1205
+finisherY := 1119
 
 ; Colors
-inactiveColor := 0x404040  ; Gray when finisher not available
-colorTolerance := 25
+inactiveColor := 0x505050  ; Gray when finisher not available
+colorTolerance := 10
 
 ; Shield orb coordinates
-shieldOrbX := 1225
-shieldOrbY := 912
+; shieldOrbX := 1225
+; shieldOrbY := 912
 
 ; Shield orb was present on last check
-shieldOrbPresent := false
+; shieldOrbPresent := false
 
 isMonitoring := false
 
@@ -44,7 +44,7 @@ F1:: {
 ; Main monitoring loop
 MonitorLoop() {
     global finisherX, finisherY, inactiveColor, colorTolerance
-    global shieldOrbX, shieldOrbY, shieldOrbPresent
+    ; global shieldOrbX, shieldOrbY, shieldOrbPresent
     global isMonitoring, gameProcess
 
     if (!isMonitoring)
