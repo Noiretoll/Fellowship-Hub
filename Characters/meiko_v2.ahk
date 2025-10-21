@@ -22,10 +22,10 @@ comboLocked := false
 isFinisherProcessing := false
 finisherPending := false
 activeComboHotkey := ""
-segmentGap := 50  ; extra buffer between combo segments (ms)
+segmentGap := 0 ; extra buffer between combo segments (ms)
 
 ; ===== COMBO CONFIGURATION =====
-gcdDelay := 1000  ; Global cooldown in milliseconds between abilities
+gcdDelay := 1050  ; Global cooldown in milliseconds between abilities
 
 ; comboTable maps each hotkey to the keys it should fire.
 ; format example: Map(
@@ -206,12 +206,6 @@ TryExecuteFinisher(force := false) {
     finisherPending := false
     isFinisherProcessing := true
 
-    needToUnlock := false
-    if (!comboLocked) {
-        comboLocked := true
-        needToUnlock := true
-    }
-
     Sleep 50  ; Safety delay
     Send "``"
     Sleep 100  ; Let game register
@@ -223,11 +217,6 @@ TryExecuteFinisher(force := false) {
     if (ColorMatch(currentColor, inactiveColor, colorTolerance)) {
         Sleep 200
     }
-
-    Sleep 200
-
-    if (needToUnlock)
-        comboLocked := false
 
     isFinisherProcessing := false
     return true
