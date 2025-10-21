@@ -22,10 +22,10 @@ comboLocked := false
 isFinisherProcessing := false
 finisherPending := false
 activeComboHotkey := ""
-segmentGap := 80  ; extra buffer between combo segments (ms)
+segmentGap := 50  ; extra buffer between combo segments (ms)
 
 ; ===== COMBO CONFIGURATION =====
-gcdDelay := 1050  ; Global cooldown in milliseconds between abilities
+gcdDelay := 1000  ; Global cooldown in milliseconds between abilities
 
 ; comboTable maps each hotkey to the keys it should fire.
 ; format example: Map(
