@@ -27,7 +27,6 @@ For research purposes only. Although AHK is rarely punished for uses like this, 
 
 **Meiko v2 Chat Protection:**
 - **Enter** or **/** - Toggle chat mode (automatic, transparent passthrough)
-- **Escape** - Cancel chat and resume script
 
 ## Configurations
 
