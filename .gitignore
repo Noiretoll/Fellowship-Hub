@@ -57,3 +57,4 @@ ClaudeCode/System Prompts/Supplemental/Module_Types.md
 .claude/settings.local.json
 ROADMAP.md
 DESIGN_meiko_tiraq.md
+.gitignore
