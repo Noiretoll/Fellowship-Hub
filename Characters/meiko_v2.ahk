@@ -40,13 +40,13 @@ class MeikoRotation {
         "!2", ["2", "3"]
     )
     static state := Map(
-        "isMonitoring", false,
+        "isMonitoring", true,
+        "autoComboEnabled", false,
         "comboActive", false,
         "comboCancelRequested", false,
         "comboLocked", false,
         "isFinisherProcessing", false,
         "finisherPending", false,
-        "activeComboHotkey", "",
         "isChatActive", false
     )
     static monitorTimer := ""
@@ -91,6 +91,8 @@ class MeikoRotation {
         for hotkeyName, keys in this.comboTable {
             Hotkey("$" . hotkeyName, ObjBindMethod(this, "RunCombo", keys, hotkeyName))
         }
+        ; Start finisher monitoring by default (isMonitoring = true)
+        SetTimer this.monitorTimer, this.Config["monitorPollInterval"]
     }
 
     ; ===== MONITOR TOGGLE =====
@@ -98,15 +100,27 @@ class MeikoRotation {
         this.isMonitoring := !this.isMonitoring
 
         if (this.isMonitoring) {
-            ToolTip "Meiko Monitoring ON - Press F1 to stop"
+            ToolTip "Auto-Finisher ON - Press F1 to toggle"
             SetTimer () => ToolTip(), -this.Config["tooltipDisplayDuration"]
             SetTimer this.monitorTimer, this.Config["monitorPollInterval"]
         } else {
-            ToolTip "Meiko Monitoring OFF"
+            ToolTip "Auto-Finisher OFF - Press F1 to toggle"
             SetTimer () => ToolTip(), -this.Config["tooltipDisplayDuration"]
             SetTimer this.monitorTimer, 0
             ; Reset chat state when monitoring is disabled
             this.state["isChatActive"] := false
+        }
+    }
+
+    static ToggleAutoCombo() {
+        this.state["autoComboEnabled"] := !this.state["autoComboEnabled"]
+
+        if (this.state["autoComboEnabled"]) {
+            ToolTip "Auto-Combo ON - Press Alt+F1 to toggle"
+            SetTimer () => ToolTip(), -this.Config["tooltipDisplayDuration"]
+        } else {
+            ToolTip "Auto-Combo OFF - Press Alt+F1 to toggle"
+            SetTimer () => ToolTip(), -this.Config["tooltipDisplayDuration"]
         }
     }
 
@@ -118,12 +132,12 @@ class MeikoRotation {
 
         ; Reset all state flags
         this.state["isMonitoring"] := false
+        this.state["autoComboEnabled"] := false
         this.state["comboActive"] := false
         this.state["comboCancelRequested"] := false
         this.state["comboLocked"] := false
         this.state["isFinisherProcessing"] := false
         this.state["finisherPending"] := false
-        this.state["activeComboHotkey"] := ""
         this.state["isChatActive"] := false
     }
 
@@ -178,16 +192,24 @@ class MeikoRotation {
 
         state := this.state
 
+        ; Only execute if auto-combo is enabled
+        if (!state["autoComboEnabled"])
+            return
+
         if (state["isChatActive"])
             return
 
+        ; Only execute if game window is active
+        if (!WinActive("ahk_exe " . this.gameProcess))
+            return
+
+        ; Prevent concurrent combo execution
         if (state["comboLocked"])
             return
 
         state["comboLocked"] := true
         state["comboActive"] := true
         state["comboCancelRequested"] := false
-        state["activeComboHotkey"] := this.NormalizeHotkey(hotkeyName != "" ? hotkeyName : A_ThisHotkey)
 
         segments := (keys.Length > 0 && keys[1] is Array) ? keys : [keys]
         rotation := this.rotation
@@ -220,8 +242,6 @@ class MeikoRotation {
                         break
                 }
             }
-        } finally {
-            this.FinishCombo()
         }
     }
 
@@ -246,6 +266,10 @@ class MeikoRotation {
             return true
 
         if (state["isChatActive"])
+            return true
+
+        ; Only send keys if game window is active
+        if (!WinActive("ahk_exe " . this.gameProcess))
             return true
 
         SendInput(key)
@@ -280,17 +304,6 @@ class MeikoRotation {
         return false
     }
 
-    static FinishCombo() {
-        state := this.state
-        state["comboActive"] := false
-        state["comboCancelRequested"] := false
-        state["comboLocked"] := false
-        state["activeComboHotkey"] := ""
-
-        if (state["finisherPending"])
-            this.TryExecuteFinisher()
-    }
-
     static TryExecuteFinisher(force := false) {
         state := this.state
         finisher := this.finisher
@@ -298,71 +311,69 @@ class MeikoRotation {
         if (state["isFinisherProcessing"])
             return false
 
-        if (!force && state["comboLocked"]) {
-            state["finisherPending"] := true
+        ; Only execute if game window is active
+        if (!WinActive("ahk_exe " . this.gameProcess))
             return false
-        }
 
-        currentColor := PixelGetColor(finisher["x"], finisher["y"])
-        if (this.ColorMatch(currentColor, finisher["inactiveColor"], finisher["tolerance"])) {
-            if (!force)
-                state["finisherPending"] := false
-            return false
-        }
-
-        state["finisherPending"] := false
-        state["isFinisherProcessing"] := true
-
-        Sleep this.Config["finisherSafetyDelay"]
-        Send "``"
-        Sleep this.Config["finisherConfirmDelay"]
-
-        shouldCancel := false
-        if (state["comboLocked"]) {
-            state["comboCancelRequested"] := true
-            shouldCancel := true
-        }
-
-        currentColor := PixelGetColor(finisher["x"], finisher["y"])
-        if (this.ColorMatch(currentColor, finisher["inactiveColor"], finisher["tolerance"])) {
-            Sleep this.Config["finisherFallbackDelay"]
-        }
-
-        state["isFinisherProcessing"] := false
-        return shouldCancel
     }
 
-    ; ===== UTILITIES =====
-    static NormalizeHotkey(hotkey) {
-        if (!hotkey)
-            return ""
-
-        hotkey := Trim(hotkey)
-        while (SubStr(hotkey, 1, 1) = "$")
-            hotkey := SubStr(hotkey, 2)
-
-        return hotkey
+    ; Check pixel color - if inactive, don't execute
+    currentColor := PixelGetColor(finisher["x"], finisher["y"])
+    if (this.ColorMatch(currentColor, finisher["inactiveColor"], finisher["tolerance"])) {
+        if (!force)
+            state["finisherPending"] := false
+        return false
     }
 
-    static ColorMatch(color1, color2, tolerance) {
-        r1 := (color1 >> 16) & 0xFF
-        g1 := (color1 >> 8) & 0xFF
-        b1 := color1 & 0xFF
+    state["finisherPending"] := false
+    state["isFinisherProcessing"] := true
 
-        r2 := (color2 >> 16) & 0xFF
-        g2 := (color2 >> 8) & 0xFF
-        b2 := color2 & 0xFF
+    Sleep this.Config["finisherSafetyDelay"]
+    Send "``"
+    Sleep this.Config["finisherConfirmDelay"]
 
-        return (Abs(r1 - r2) <= tolerance) && (Abs(g1 - g2) <= tolerance) && (Abs(b1 - b2) <= tolerance)
+    ; If finisher triggers during combo, cancel the combo
+    shouldCancel := false
+    if (state["comboLocked"]) {
+        state["comboCancelRequested"] := true
+        shouldCancel := true
     }
+
+    ; Double-check finisher state
+    currentColor := PixelGetColor(finisher["x"], finisher["y"])
+    if (this.ColorMatch(currentColor, finisher["inactiveColor"], finisher["tolerance"])) {
+        Sleep this.Config["finisherFallbackDelay"]
+    }
+
+    state["isFinisherProcessing"] := false
+    return shouldCancel
+}
+
+; ===== UTILITIES =====
+static ColorMatch(color1, color2, tolerance) {
+    r1 := (color1 >> 16) & 0xFF
+    g1 := (color1 >> 8) & 0xFF
+    b1 := color1 & 0xFF
+
+    r2 := (color2 >> 16) & 0xFF
+    g2 := (color2 >> 8) & 0xFF
+    b2 := color2 & 0xFF
+
+    return (Abs(r1 - r2) <= tolerance) && (Abs(g1 - g2) <= tolerance) && (Abs(b1 - b2) <= tolerance)
+}
 }
 
 ; ===== INITIALIZE HOTKEYS =====
 MeikoRotation.Init()
 
-; Toggle monitoring with F1
+; Toggle auto-finisher with F1
 F1:: {
     MeikoRotation.ToggleMonitoring()
+}
+
+; Toggle auto-combo with Alt+F1
+!F1:: {
+    MeikoRotation.ToggleAutoCombo()
 }
 
 ; Exit script with F10
