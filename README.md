@@ -51,4 +51,19 @@ Most scripts use:
 - **Enter** - Opens chat (pauses automation)
 - **Escape** - Cancel chat
 
+<<<<<<< HEAD
 See individual script files or documentation for specific controls.
+=======
+**Meiko v2 Chat Protection:**
+- **Enter** or **/** - Toggle chat mode (automatic, transparent passthrough)
+
+## Configurations
+
+Note: AutoHotKey 2.0+ required
+
+### Display Settings
+
+**Resolution:** 2560x1440
+**Window:** Borderless
+**Resolution Scale:** 100
+>>>>>>> ade39209d68d7c805a9534164dd605e5fa9221fa
