@@ -1,22 +1,8 @@
-; meiko_framework.ahk
-; Meiko character script using event-driven framework architecture
-; Implements two-layer pattern: Character-specific configuration + Generic framework engines
-;
-; Architecture: Event-Driven (Post-Phase 8 + Finisher Integration)
-; - EventBus: Central event hub for all communication
-; - PixelMonitor: Detects finisher availability via pixel detection
-; - SequenceEngine: Executes combo sequences with integrated finisher callback
-; - HotkeyDispatcher: Registers combo hotkeys and emits events
-;
-; Finisher Pattern:
-; - Finisher is NOT an independent engine
-; - After each combo completes (2nd key pressed), wait 10ms
-; - Check pixel state, if finisher ready -> send finisher key
-; - Finisher only fires AFTER combo completion, not during
-;
 ; Controls:
 ;   Alt+F1   - Toggle auto-combo ON/OFF (default: OFF, includes finisher)
 ;   3, !3, 1, !1, 2, !2 - Combo sequences (when auto-combo enabled)
+;   In-Game Keybindings: Earth: 1, Wind: 2, Spirit: 3, Finisher: `
+;   Use Autohotkey Window Spy to configure X and Y coordinates on lines 73/74 of this script. Target a light-gray area of your Finisher Icon when its inactive 
 ;   Enter, / - Open chat (pauses all automation)
 ;   Escape   - Cancel chat (resumes automation)
 ;   F10      - Exit script
