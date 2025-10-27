@@ -10,7 +10,7 @@ AutoHotkey v2 scripts for Fellowship.
 1. Install [AutoHotkey v2.0+](https://www.autohotkey.com/)
 2. Configure game to 2560x1440 borderless windowed mode at 100% resolution scale
 3. Choose a character script from `Characters/` folder
-4. Calibrate pixel coordinates for your system
+4. Follow instructions at the beginning of the Character script.
 5. Run the script
 
 ## Requirements
