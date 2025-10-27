@@ -10,35 +10,18 @@ This repository contains AutoHotkey v2 scripts for automating combat rotations i
 
 ## Active Scripts
 
-### Original Standalone Scripts
-- `Characters/meiko_v2.ahk` - Original Meiko rotation script with combo automation and finisher detection
-- `Characters/tiraq.ahk` - Original Tiraq rotation script with swing timer and Thunder Call automation
-
-### Framework-Based Scripts ⚠️ NON-FUNCTIONAL
-- `Characters/meiko_framework.ahk` - **BROKEN** - Do not use
-- `Characters/tiraq_framework.ahk` - **BROKEN** - Do not use
-
-**Note**: Framework-based scripts have fundamental architectural issues and do not work. Use original standalone scripts until framework is completely refactored.
+- `Characters/meiko_framework.ahk` - Event-driven Meiko script (production)
+- `Characters/tiraq.ahk` - Tiraq rotation script with swing timer and Thunder Call automation
 
 ## Running Scripts
 
 Scripts require AutoHotkey v2.0+ installed on Windows. To run:
 
-### Original Scripts
 ```bash
-# Run individual script by double-clicking the .ahk file or:
-AutoHotkey.exe Characters/meiko_v2.ahk
+# Run scripts by double-clicking the .ahk file or:
+AutoHotkey.exe Characters/meiko_framework.ahk
 AutoHotkey.exe Characters/tiraq.ahk
 ```
-
-### Framework-Based Scripts ⚠️ DO NOT USE
-```bash
-# Framework scripts are BROKEN - do not use:
-# AutoHotkey.exe Characters/meiko_framework.ahk  # BROKEN
-# AutoHotkey.exe Characters/tiraq_framework.ahk  # BROKEN
-```
-
-**Framework is non-functional** - requires complete architectural rework before it can be used.
 
 ## Required Game Settings
 
@@ -61,37 +44,49 @@ Each script relies on pixel-perfect coordinate detection. All pixel coordinates 
 
 ## Framework Architecture
 
-**⚠️ FRAMEWORK NON-FUNCTIONAL - DO NOT USE ⚠️**
+### Current Status: Event-Driven Architecture Complete ✅
 
-The framework-based scripts (`meiko_framework.ahk`, `tiraq_framework.ahk`) are **currently broken and non-functional**. The architecture has fundamental design flaws documented in `Framework/ARCHITECTURE_ANALYSIS.md`.
+Event-driven framework with Phase 1-8 complete. Eliminates circular dependencies through EventBus pub/sub pattern.
 
-**Use original standalone scripts instead**:
-- ✅ `Characters/meiko_v2.ahk` - **Working**
-- ✅ `Characters/tiraq.ahk` - **Working**
+**Available Scripts:**
 
-**Known Framework Issues**:
-- Circular dependencies between framework and engines
-- Scattered state management across multiple locations
-- Tight coupling between engine components
-- Variable scope issues in conditional object creation
-- Hotkey callbacks not passing through correctly
-- Logic issues preventing combo execution
+- ✅ `Characters/meiko_framework.ahk` - Event-driven Meiko script (production)
+- ✅ `Characters/tiraq.ahk` - Standalone Tiraq script
 
-**Status**: Framework is **non-functional**. Complete architectural rework required - see `Framework/ARCHITECTURE_ANALYSIS.md` for proposed solutions.
+**Completed Phases:**
 
-**See `Framework/ARCHITECTURE_ANALYSIS.md` for detailed architectural analysis and refactoring options.**
+- ✅ **Phase 1-8**: EventBus, BaseEngine, SequenceEngine (with finisher callbacks), PriorityEngine, PixelMonitor, HotkeyDispatcher
+- ✅ **Finisher Integration**: Integrated into SequenceEngine as post-completion callback (10ms delay after combo)
 
-### Core Components (Current Implementation)
+**See `Framework/SYSTEM_DESIGN.md` for detailed architecture documentation.**
+
+### Core Components (Event-Driven Architecture)
 
 ```
 Framework/
-├── RotationFramework.ahk      # Core framework (config, pixel detection, chat protection)
-├── ARCHITECTURE_ANALYSIS.md   # Detailed architectural analysis and design patterns
+├── EventBus.ahk                    # Central event hub (pub/sub pattern)
+├── BaseEngine.ahk                  # Abstract engine base class
+├── PixelMonitor.ahk                # Pixel detection system (window/pixel state)
+├── HotkeyDispatcher.ahk            # Hotkey registration system (emits HotkeyPressed events)
+├── SYSTEM_DESIGN.md                # Architecture documentation
 └── Engines/
-    ├── AutoExecuteEngine.ahk  # Auto-finisher pattern (always-active pixel monitoring)
-    ├── SequenceEngine.ahk     # Combo sequences (hotkey-triggered ability chains)
-    └── PriorityEngine.ahk     # Priority-based rotation (condition-driven execution)
+    ├── SequenceEngine.ahk          # Combo sequences with finisher callback integration
+    └── PriorityEngine.ahk          # Priority-based rotation (condition-driven)
 ```
+
+### Event-Driven Design Principles
+
+**Architecture Goals:**
+
+1. **No Circular Dependencies**: Engines communicate exclusively through EventBus
+2. **Generic Framework Engines**: Framework engines accept configuration data, character scripts provide specific values
+3. **Unified State Management**: All state stored in EventBus.state Map
+4. **Observable Behavior**: All actions emit events for monitoring and debugging
+
+**Two-Layer Pattern:**
+
+- **Framework Layer**: Generic, reusable engines (SequenceEngine with finisher callbacks, PriorityEngine)
+- **Character Layer**: Character-specific scripts that configure and compose framework engines
 
 ### State Machine Pattern
 
@@ -102,11 +97,8 @@ All scripts follow a common state machine pattern:
 3. **Color Detection**: `PixelGetColor(x, y)` + `ColorMatch()` helper with RGB tolerance determines state transitions
 4. **Input Dispatch**: `SendInput` with explicit `Sleep` calls to honor in-game timing
 5. **Chat Protection**: Automatic pause when in-game chat is active
+6. **Event Emission**: State changes and actions emit events via EventBus
 
-### Example Configs
-
-- `Characters/Configs/meiko.ini` - Sequence + Auto-Execute pattern (combo system + auto-finisher)
-- `Characters/Configs/tiraq.ini` - Priority-based pattern (swing timer + Thunder Call with individual toggles)
 
 ## Common Gotchas
 
@@ -115,6 +107,46 @@ All scripts follow a common state machine pattern:
 3. **Window Focus**: Scripts silently fail if game window loses focus (by design)
 4. **Pixel Coordinates**: Single-pixel off means total detection failure—use Window Spy precisely
 5. **Hotkey Callbacks**: Methods bound to hotkeys must accept variadic parameters: `Toggle(*)`
+
+## Debugging and Troubleshooting
+
+For complex issues requiring systematic debugging, use the **debugger agent**:
+
+**When to Use:**
+
+- Complex bugs with multiple potential root causes
+- State transition issues or timing problems
+- Memory leaks or circular reference detection
+- Hotkey conflicts or input hook issues
+- Performance bottlenecks requiring measurement
+
+**How to Use:**
+
+1. Reference `.claude/agents/debugger.md` for comprehensive debugging procedures
+2. Add debug statements with `[DEBUGGER:location:line]` prefix for easy cleanup
+3. Create isolated test files: `test_debug_<issue>_<timestamp>.ahk`
+4. Log entry/exit points for suspect functions
+5. Use at least 10 strategic debug points before forming hypotheses
+
+**Quick Debug Patterns:**
+
+```ahk
+; Console output for runtime debugging
+FileAppend "[DEBUGGER:Function::Method:142] variable='" value "'`n", "*"
+
+; State transition logging
+FileAppend "[DEBUGGER:State] Transition: '" oldState "' -> '" newState "'`n", "*"
+
+; Timing measurements
+elapsed := A_TickCount - startTime
+FileAppend "[DEBUGGER:Timing] Elapsed: " elapsed "ms`n", "*"
+```
+
+**Cleanup:**
+
+- All debug statements include `DEBUGGER:` prefix for easy removal
+- Use grep/PowerShell to remove all debug lines before committing
+- Delete all `test_debug_*.ahk` files after debugging session
 
 ## AutoHotkey v2 Reference
 
@@ -133,41 +165,32 @@ Do NOT rely on memory or assumptions about AHK v2 syntax. Use Context7 for:
 
 **Query Context7 before implementing any new AHK v2 features.**
 
-## Roadmap
+### `unset` Keyword Usage
 
-### Standardized Rotation Framework ⚠️ COMPLETE BUT FLAWED
+**FUNDAMENTAL RULE:** `unset` is for **variables** and **function parameters** ONLY. **NEVER** use `unset` with object properties.
 
-**Goal**: Create a reusable template/framework for building rotation scripts for other Fellowship classes.
+**Common Mistakes:**
 
-**Implementation**: See `Framework/` directory and `Framework/README_Framework.md` for complete documentation.
+```ahk
+// ❌ WRONG - CAUSES MEMORY CRASHES
+this.timer := unset       // Invalid memory read/write error
+if IsSet(this.timer)      // Error: IsSet requires a variable
 
-**Features Implemented**:
+// ✅ CORRECT
+this.DeleteProp("timer")  // Safe property removal
+if this.HasProp("timer")  // Check property existence
+```
 
-- **Modular Architecture**: Three execution engines (Auto-Execute, Sequence, Priority)
-- **INI Configuration**: Character-specific settings in `Characters/Configs/*.ini` with extensive inline documentation
-- **Pixel Monitoring System**: Framework-level pixel detection with tolerance matching and inversion support
-- **Individual Ability Toggles**: Each ability can be enabled/disabled independently via hotkeys
-- **Chat Protection**: Automatic pause during in-game chat (Enter/Slash/Escape handling)
-- **Window Focus Guards**: Only sends inputs when game window is active
-- **Template System**: Character template in `Characters/Templates/character_template.ahk`
+**Valid Uses:**
 
-**Usage**:
+- Local variables: `myVar := unset` ✅
+- Function parameters: `MyFunc(param := unset)` ✅
+- Skip parameters: `Run("notepad.exe", unset, "Min")` ✅
 
-1. Copy `Characters/Templates/character_template.ahk`
-2. Create INI config file with pixel targets and abilities (see existing configs for reference)
-3. Calibrate pixel coordinates using AutoHotkey Window Spy
-4. Run character script
+**Property Operations:**
 
-**Status**: ❌ **NON-FUNCTIONAL**. Framework does not work and has never worked. Requires complete architectural rework from the ground up. See `Framework/ARCHITECTURE_ANALYSIS.md` for detailed analysis and proposed solutions.
+- Remove property: `obj.DeleteProp("propName")` ✅
+- Check property: `obj.HasProp("propName")` ✅
+- NEVER use: `obj.propName := unset` ❌ (causes crashes)
 
-### Upcoming: Architecture Refactor 🔄 PLANNED
-
-**Goal**: Resolve fundamental architectural issues in the rotation framework.
-
-**Key Issues to Address**:
-- Eliminate circular dependencies between framework and engines
-- Centralize state management
-- Decouple engine components
-- Implement proper factory or event-driven pattern
-
-**Approach**: TBD - pending decision on refactoring scope (see `Framework/ARCHITECTURE_ANALYSIS.md` for options)
+**See `Framework/SYSTEM_DESIGN.md` for complete `unset` usage patterns and examples.**

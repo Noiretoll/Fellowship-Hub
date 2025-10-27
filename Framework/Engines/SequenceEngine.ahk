@@ -1,227 +1,213 @@
-#Requires AutoHotkey v2.0
+; SequenceEngine.ahk
+; Generic step sequencer with configurable action sequences and optional post-sequence callback
+; Phase 6: Event-Driven Generic Architecture (no character-specific logic)
+; Post-Phase 8: Finisher integration pattern
+;
+; Purpose: Execute sequences of keypresses with configurable delays, optionally executing
+;          a finisher action after sequence completes (e.g., Meiko finisher after 2-step combo)
 
-class SequenceEngine {
-    ; Framework references - initialized in __New()
-    framework := ""
-    sequences := Map()
+#Requires AutoHotkey v2.0
+#Include ..\BaseEngine.ahk
+
+class SequenceEngine extends BaseEngine {
+    ; Configuration properties
+    steps := []            ; Array of step objects: [{key: "1", delay: 1050}, ...]
+    finisherCallback := "" ; Optional callback function to check/execute finisher after completion
+    finisherDelay := 10    ; Delay in ms before calling finisher callback (default: 10ms)
 
     ; State flags
-    isEnabled := false
-    isLocked := false
-    cancelRequested := false
+    sequenceActive := false  ; True during sequence execution
+    currentStep := 0         ; Current step index (1-based)
 
-    ; Timing configuration
-    gcdDelay := 1050
-    keyDelay := 30
-    waitPollStep := 25
+    ; Constructor
+    ; Parameters:
+    ;   bus              - EventBus reference for all communication
+    ;   name             - Engine identifier (any string, e.g., "MeikoCombo", "TiraqRotation")
+    ;   steps            - Array of step objects [{key: "1", delay: 1050}, {key: "2", delay: 10}, ...]
+    ;   finisherCallback - Optional function to call after sequence completes (for finisher detection/execution)
+    ;   finisherDelay    - Delay in ms before calling finisher callback (default: 10ms)
+    __New(bus, name, steps := [], finisherCallback := "", finisherDelay := 10) {
+        ; Call parent constructor
+        super.__New(bus, name)
 
-    ; Control references
-    toggleHotkey := ""
-    autoExecuteEngine := ""
+        ; Validate and store steps
+        if !IsObject(steps) {
+            throw ValueError("steps must be an array", -1)
+        }
 
-    __New(framework) {
-        this.framework := framework
-
-        this.gcdDelay := framework.config.Has("gcdDelay") ?
-            framework.config["gcdDelay"] : 1050
-
-        this._LoadSequences()
-        this._SetupHotkeys()
+        this.steps := steps
+        this.finisherCallback := finisherCallback
+        this.finisherDelay := finisherDelay
+        this.sequenceActive := false
+        this.currentStep := 0
     }
 
+    ; Start monitoring (enables sequence execution)
     Start() {
-        if this.isEnabled
-            return
-
-        this.isEnabled := true
-
-        ToolTip "Sequence Engine Started"
-        SetTimer () => ToolTip(), -2000
+        ; Call parent Start (sets isMonitoring, emits EngineStarted)
+        super.Start()
     }
 
+    ; Stop monitoring (disables sequence execution)
     Stop() {
-        if !this.isEnabled
-            return
+        ; Interrupt any active sequence
+        if this.sequenceActive {
+            this.InterruptSequence("Engine stopped")
+        }
 
-        this.isEnabled := false
-        this.isLocked := false
-        this.cancelRequested := false
-
-        ToolTip "Sequence Engine Stopped"
-        SetTimer () => ToolTip(), -2000
+        ; Call parent Stop (sets isMonitoring false, unsubscribes all, emits EngineStopped)
+        super.Stop()
     }
 
-    SetAutoExecuteEngine(engine) {
-        this.autoExecuteEngine := engine
+    ; Execute the configured sequence
+    ; If a sequence is already running, it will be interrupted and restarted
+    ExecuteSequence() {
+        ; Skip if not monitoring
+        if !this.isMonitoring {
+            return
+        }
+
+        ; Check protection guards via state
+        if this.GetState("chatActive", false) {
+            return
+        }
+
+        if !this.GetState("windowActive", true) {
+            return
+        }
+
+        ; Interrupt existing sequence if running (immediate restart pattern)
+        if this.sequenceActive {
+            this.InterruptSequence("New sequence requested")
+        }
+
+        ; Start new sequence
+        this.sequenceActive := true
+        this.currentStep := 1
+
+        ; Emit sequence started event
+        this.EmitEvent("SequenceStarted", {
+            engine: this.name,
+            stepCount: this.steps.Length
+        })
+
+        ; Begin execution
+        this._ExecuteNextStep()
     }
 
-    RunSequence(abilityName, *) {
-        if !this.sequences.Has(abilityName)
+    ; Execute next step in sequence (recursive timer pattern)
+    _ExecuteNextStep() {
+        ; Check if sequence was interrupted
+        if !this.sequenceActive {
             return
+        }
 
-        if !this.isEnabled
+        ; Check if sequence is complete
+        if this.currentStep > this.steps.Length {
+            this._CompleteSequence()
             return
+        }
 
-        if this.framework.isChatActive
+        ; Get current step
+        step := this.steps[this.currentStep]
+
+        ; Emit step event
+        this.EmitEvent("SequenceStep", {
+            engine: this.name,
+            step: this.currentStep,
+            key: step.key
+        })
+
+        ; Execute step (send key)
+        Send step.key
+
+        ; Move to next step
+        this.currentStep++
+
+        ; Schedule next step with delay (or execute immediately if delay = 0)
+        if step.delay > 0 {
+            ; Use one-time timer (negative period) for next step
+            SetTimer(() => this._ExecuteNextStep(), -step.delay)
+        } else {
+            ; Execute immediately (no delay)
+            this._ExecuteNextStep()
+        }
+    }
+
+    ; Interrupt current sequence
+    ; Parameters:
+    ;   reason - String describing why sequence was interrupted
+    InterruptSequence(reason) {
+        ; Only interrupt if sequence is active
+        if !this.sequenceActive {
             return
+        }
 
-        if !this.framework.IsGameActive()
+        ; Emit interruption event
+        this.EmitEvent("SequenceInterrupted", {
+            engine: this.name,
+            step: this.currentStep,
+            reason: reason
+        })
+
+        ; Clear sequence state
+        this.sequenceActive := false
+        this.currentStep := 0
+    }
+
+    ; Complete sequence successfully
+    _CompleteSequence() {
+        ; Emit completion event
+        this.EmitEvent("SequenceComplete", {
+            engine: this.name,
+            steps: this.steps.Length
+        })
+
+        ; Reset state
+        this.sequenceActive := false
+        this.currentStep := 0
+
+        ; Execute finisher callback if provided
+        ; Pattern: Wait finisherDelay ms, then call callback to check/execute finisher
+        ; Used for Meiko: After 2nd combo key pressed, wait 200ms, check pixel, send finisher if ready
+        if IsObject(this.finisherCallback) {
+            ; Use one-time timer for delay (negative period = run once)
+            SetTimer(() => this._ExecuteFinisher(), -this.finisherDelay)
+        }
+    }
+
+    ; Execute finisher callback (called after finisherDelay)
+    _ExecuteFinisher() {
+        ; Check protection guards
+        if this.GetState("chatActive", false) {
             return
+        }
 
-        if this.isLocked
+        if !this.GetState("windowActive", true) {
             return
+        }
 
-        sequence := this.sequences[abilityName]
-
-        this.isLocked := true
-        this.framework.state["comboLocked"] := true
-        this.framework.state["comboActive"] := true
-        this.cancelRequested := false
-
+        ; Call the finisher callback
+        ; Callback should check pixel condition and send finisher key if ready
         try {
-            this._ExecuteSequence(sequence)
-        } finally {
-            this._FinishSequence()
+            this.finisherCallback.Call()
+        } catch Error as e {
+            ; Emit error event but don't crash
+            this.EmitEvent("FinisherError", {
+                engine: this.name,
+                error: e.Message
+            })
         }
     }
 
-    Toggle(*) {
-        if this.isEnabled
-            this.Stop()
-        else
-            this.Start()
-    }
-
-    _LoadSequences() {
-        for abilityName, ability in this.framework.abilities {
-            if ability["type"] != "sequence" && !ability.Has("sequence")
-                continue
-
-            if !ability.Has("sequence")
-                continue
-
-            this.sequences[abilityName] := ability
-        }
-    }
-
-    _SetupHotkeys() {
-        configPath := this.framework.config["configPath"]
-
-        toggleKey := IniRead(configPath, "Engine_Sequence", "ToggleHotkey", "!F1")
-        if toggleKey != "" {
-            this.toggleHotkey := toggleKey
-            Hotkey(toggleKey, this.Toggle.Bind(this))
-        }
-
-        for abilityName, ability in this.sequences {
-            triggerKey := ability["hotkey"]
-            if triggerKey != ""
-                Hotkey("$" . triggerKey, this.RunSequence.Bind(this, abilityName))
-        }
-    }
-
-    _ExecuteSequence(ability) {
-        if !ability.Has("sequence")
-            return
-
-        sequence := ability["sequence"]
-
-        for index, key in sequence {
-            key := Trim(key)
-
-            if this._CheckInterrupt()
-                break
-
-            if this._SendKey(key)
-                break
-
-            if index < sequence.Length {
-                if this._WaitWithChecks(this.gcdDelay)
-                    break
-
-                if this._CheckInterrupt()
-                    break
-            }
-        }
-    }
-
-    _SendKey(key) {
-        if this.cancelRequested
-            return true
-
-        if this.framework.isChatActive
-            return true
-
-        if !this.framework.IsGameActive()
-            return true
-
-        SendInput(key)
-        Sleep this.keyDelay
-
-        return false
-    }
-
-    _WaitWithChecks(duration) {
-        endTime := A_TickCount + duration
-
-        while true {
-            if this.framework.isChatActive
-                return true
-
-            if this._CheckInterrupt()
-                return true
-
-            if this.cancelRequested
-                return true
-
-            remaining := endTime - A_TickCount
-            if remaining <= 0
-                break
-
-            sleepChunk := (remaining < this.waitPollStep) ? remaining : this.waitPollStep
-            Sleep sleepChunk
-        }
-
-        return false
-    }
-
-    _CheckInterrupt() {
-        if !this.autoExecuteEngine
-            return false
-
-        if !this.autoExecuteEngine.isMonitoring
-            return false
-
-        if this.framework.CheckPixelCondition(this.autoExecuteEngine.pixelTarget) {
-            this.autoExecuteEngine.Execute(true)
-            return true
-        }
-
-        return false
-    }
-
-    _FinishSequence() {
-        this.framework.state["comboActive"] := false
-        this.framework.state["comboLocked"] := false
-        this.cancelRequested := false
-        this.isLocked := false
-
-        if this.autoExecuteEngine && this.autoExecuteEngine.isPending {
-            this.autoExecuteEngine.isPending := false
-            this.autoExecuteEngine.Execute()
-        }
-    }
-
+    ; Destructor - cleanup
     __Delete() {
-        this.Stop()
-
-        if this.toggleHotkey != ""
-            try Hotkey(this.toggleHotkey, "Off")
-
-        for abilityName, ability in this.sequences {
-            triggerKey := ability["hotkey"]
-            if triggerKey != ""
-                try Hotkey("$" . triggerKey, "Off")
+        ; Interrupt any active sequence
+        if this.sequenceActive {
+            this.InterruptSequence("Engine deleted")
         }
+
+        ; Call parent destructor (emits EngineDeleted, cleans subscriptions, removes bus)
+        super.__Delete()
     }
 }
