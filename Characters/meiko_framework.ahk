@@ -45,7 +45,7 @@ class MeikoCharacter {
     ; Configuration
     gameProcess := "fellowship-Win64-Shipping.exe"
     gcdDelay := 1050       ; Global cooldown delay between combo steps
-    finisherDelay := 10    ; Delay after combo completion before finisher check/execution
+    finisherDelay := 200   ; Delay after combo completion before finisher check/execution
     finisherKey := "``"    ; Finisher keybind (backtick)
 
     ; State flags
@@ -152,7 +152,7 @@ class MeikoCharacter {
     }
 
     ; ===== FINISHER CALLBACK =====
-    ; Called 10ms after each combo completes
+    ; Called 200ms after each combo completes
     ; Checks pixel condition and executes finisher if ready
     CheckAndExecuteFinisher() {
         ; Check if finisher pixel is ready (state set by PixelMonitor)
@@ -172,13 +172,14 @@ class MeikoCharacter {
     ; ===== COMBO HOTKEY SETUP =====
     _SetupComboHotkeys() {
         ; Map hotkeys to combo names
+        ; $ prefix prevents hotkey from triggering itself when Send is used
         hotkeyMap := Map(
-            "3", "Combo3",
-            "!3", "Combo3Alt",
-            "1", "Combo1",
-            "!1", "Combo1Alt",
-            "2", "Combo2",
-            "!2", "Combo2Alt"
+            "$3", "Combo3",
+            "$!3", "Combo3Alt",
+            "$1", "Combo1",
+            "$!1", "Combo1Alt",
+            "$2", "Combo2",
+            "$!2", "Combo2Alt"
         )
 
         ; Create HotkeyDispatcher to register hotkeys

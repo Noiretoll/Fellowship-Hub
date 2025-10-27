@@ -10,32 +10,17 @@ This repository contains AutoHotkey v2 scripts for automating combat rotations i
 
 ## Active Scripts
 
-### Original Standalone Scripts
-
-- `Characters/meiko_v2.ahk` - Original Meiko rotation script with combo automation and finisher detection
-- `Characters/tiraq.ahk` - Original Tiraq rotation script with swing timer and Thunder Call automation
-
-### Framework-Based Scripts
-
-- `Characters/meiko_framework.ahk` - Event-driven Meiko script (Phase 1-8 complete, in testing)
+- `Characters/meiko_framework.ahk` - Event-driven Meiko script (production)
+- `Characters/tiraq.ahk` - Tiraq rotation script with swing timer and Thunder Call automation
 
 ## Running Scripts
 
 Scripts require AutoHotkey v2.0+ installed on Windows. To run:
 
-### Original Scripts
-
 ```bash
-# Run individual script by double-clicking the .ahk file or:
-AutoHotkey.exe Characters/meiko_v2.ahk
-AutoHotkey.exe Characters/tiraq.ahk
-```
-
-### Framework Scripts
-
-```bash
-# Run framework-based scripts:
+# Run scripts by double-clicking the .ahk file or:
 AutoHotkey.exe Characters/meiko_framework.ahk
+AutoHotkey.exe Characters/tiraq.ahk
 ```
 
 ## Required Game Settings
@@ -65,9 +50,8 @@ Event-driven framework with Phase 1-8 complete. Eliminates circular dependencies
 
 **Available Scripts:**
 
-- ✅ `Characters/meiko_v2.ahk` - Original standalone Meiko script
-- ✅ `Characters/tiraq.ahk` - Original standalone Tiraq script
-- ✅ `Characters/meiko_framework.ahk` - Event-driven Meiko script (integration testing phase)
+- ✅ `Characters/meiko_framework.ahk` - Event-driven Meiko script (production)
+- ✅ `Characters/tiraq.ahk` - Standalone Tiraq script
 
 **Completed Phases:**
 
@@ -209,4 +193,4 @@ if this.HasProp("timer")  // Check property existence
 - Check property: `obj.HasProp("propName")` ✅
 - NEVER use: `obj.propName := unset` ❌ (causes crashes)
 
-**See `Framework/ARCHITECTURE_REWORK_PLAN.md` for complete `unset` usage patterns and examples.**
+**See `Framework/SYSTEM_DESIGN.md` for complete `unset` usage patterns and examples.**

@@ -169,7 +169,7 @@ class SequenceEngine extends BaseEngine {
 
         ; Execute finisher callback if provided
         ; Pattern: Wait finisherDelay ms, then call callback to check/execute finisher
-        ; Used for Meiko: After 2nd combo key pressed, wait 10ms, check pixel, send finisher if ready
+        ; Used for Meiko: After 2nd combo key pressed, wait 200ms, check pixel, send finisher if ready
         if IsObject(this.finisherCallback) {
             ; Use one-time timer for delay (negative period = run once)
             SetTimer(() => this._ExecuteFinisher(), -this.finisherDelay)

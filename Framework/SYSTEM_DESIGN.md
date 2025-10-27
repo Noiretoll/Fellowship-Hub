@@ -251,6 +251,29 @@ engine := SequenceEngine(
 - Finisher callback checks pixel state: `bus.GetState("pixel_Finisher")`
 - If finisher ready → send finisher key → emit `FinisherExecuted`
 
+**Finisher Modes:**
+
+Character scripts may implement two independent finisher modes:
+
+1. **Auto-Combo Mode (includes finisher):**
+   - Executes combo sequences automatically
+   - Fires finisher 200ms after each combo completes
+   - Toggle: Alt+F1 (default)
+
+2. **Finisher-Only Mode (no combo):**
+   - Does NOT execute combos automatically
+   - Fires finisher immediately when pixel becomes active
+   - Independent of auto-combo mode
+   - Can run simultaneously with manual combo execution
+   - Toggle: Separate hotkey (character-specific)
+
+**Implementation Notes:**
+
+- Both modes monitor same finisher pixel (`pixel_Finisher`)
+- Finisher-Only mode uses PixelMonitor event: `PixelStateChanged`
+- Auto-Combo mode uses SequenceEngine callback after combo completion
+- Modes are independent: can enable both, either, or neither
+
 ---
 
 ### PriorityEngine
@@ -336,14 +359,16 @@ class MeikoCharacter {
 
 In-game mechanic: Finisher becomes available during combo execution but should fire AFTER combo completes (not interrupt mid-combo).
 
-**Post-Sequence Callback Pattern:**
+**Pattern 1: Post-Sequence Callback (Auto-Combo Mode)**
+
+Used when finisher should fire after combo completes.
 
 ```
 Combo Execution Flow:
 1. Send Key1 → Wait GCD (1050ms)
 2. Send Key2 → Wait 0ms
 3. Combo Complete
-4. Wait 10ms (finisher delay)
+4. Wait 200ms (finisher delay)
 5. Check finisher pixel state
 6. If ready → Send finisher key
 ```
@@ -355,7 +380,7 @@ Combo Execution Flow:
 finisherCallback := this.CheckAndExecuteFinisher.Bind(this)
 
 ; SequenceEngine calls callback after completion
-engine := SequenceEngine(bus, name, steps, finisherCallback, 10)
+engine := SequenceEngine(bus, name, steps, finisherCallback, 200)
 
 ; Callback checks pixel state and executes
 CheckAndExecuteFinisher() {
@@ -369,9 +394,50 @@ CheckAndExecuteFinisher() {
 }
 ```
 
+**Pattern 2: Pixel-Driven Finisher (Finisher-Only Mode)**
+
+Used when finisher should fire immediately when pixel becomes active, independent of combos.
+
+```
+Finisher-Only Flow:
+1. PixelMonitor detects finisher pixel active
+2. Emits PixelStateChanged event
+3. Character script receives event
+4. If finisher-only mode enabled → Send finisher key
+```
+
+**Implementation:**
+
+```ahk
+; Subscribe to pixel state changes
+this.bus.Subscribe("PixelStateChanged", this.HandlePixelChange.Bind(this))
+
+; Handle pixel state changes
+HandlePixelChange(data := unset) {
+    if !IsSet(data) || data.name != "Finisher"
+        return
+
+    ; Only fire if finisher-only mode enabled
+    if !this.finisherOnlyEnabled
+        return
+
+    ; Only fire if pixel became active (not inactive)
+    if !data.active
+        return
+
+    ; Execute finisher immediately
+    Send this.finisherKey
+    this.bus.Emit("FinisherExecuted", {timestamp: A_TickCount, mode: "finisher-only"})
+}
+```
+
 **Key Points:**
 
-- Finisher delay: 10ms after combo completion
+- **Pattern 1** (Post-Sequence): Finisher fires 200ms after combo completion
+- **Pattern 2** (Pixel-Driven): Finisher fires immediately when pixel becomes active
+- Both patterns use same finisher pixel (`pixel_Finisher`)
+- Both patterns can be enabled simultaneously (independent modes)
+- Window/chat guards apply to both patterns
 - Pixel state: Set by PixelMonitor (`pixel_Finisher`)
 - Callback: Character-specific logic, not framework code
 - Event emission: `FinisherExecuted` for tracking/debugging
@@ -380,7 +446,7 @@ CheckAndExecuteFinisher() {
 
 ### Event Flow Patterns
 
-**Combo Execution Flow:**
+**Combo Execution Flow (Auto-Combo Mode):**
 
 ```
 User presses hotkey "3"
@@ -399,7 +465,7 @@ Execute steps: Send "3", Sleep 1050ms, Send "1"
   ↓
 Emit: SequenceComplete {name: "Combo3"}
   ↓
-Wait 10ms
+Wait 200ms
   ↓
 Call finisher callback
   ↓
@@ -407,7 +473,23 @@ Check pixel state
   ↓
 If ready: Send finisher key
   ↓
-Emit: FinisherExecuted
+Emit: FinisherExecuted {mode: "auto-combo"}
+```
+
+**Finisher-Only Mode Flow:**
+
+```
+PixelMonitor detects finisher pixel active
+  ↓
+Emit: PixelStateChanged {name: "Finisher", active: true}
+  ↓
+Character script receives event
+  ↓
+Check: finisher-only mode enabled?
+  ↓
+If enabled: Send finisher key immediately
+  ↓
+Emit: FinisherExecuted {mode: "finisher-only"}
 ```
 
 **Pixel Monitoring Flow:**
@@ -895,8 +977,7 @@ See individual test files for manual test procedures.
 Fellowship-Hub/
 ├── Characters/
 │   ├── meiko_framework.ahk         # Event-driven Meiko (production)
-│   ├── meiko_v2.ahk                # Standalone Meiko (backup)
-│   └── tiraq.ahk                   # Standalone Tiraq (backup)
+│   └── tiraq.ahk                   # Standalone Tiraq
 │
 ├── Framework/
 │   ├── EventBus.ahk                # Central event hub

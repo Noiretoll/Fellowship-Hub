@@ -22,7 +22,9 @@
       "Bash(del \"Framework\\Tests\\Manual_Test_Phase8.ahk\")",
       "Bash(del \"Framework\\Tests\\AutoRun_Test_Meiko.ahk\")",
       "Bash(del \"Characters\\Configs\\meiko.ini\")",
-      "Bash(del \"Characters\\Configs\\tiraq.ini\")"
+      "Bash(del \"Characters\\Configs\\tiraq.ini\")",
+      "Bash(git push:*)",
+      "Bash(\"C:\\Program Files\\AutoHotkey\\v2\\AutoHotkey64.exe\" \"d:\\Games\\Fellowship\\Fellowship-Hub\\test_debug_sequence_timing_20251027.ahk\")"
     ],
     "deny": [],
     "ask": []

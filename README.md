@@ -6,10 +6,6 @@
 
 AutoHotkey v2 scripts for automating combat rotations in Fellowship. Scripts use pixel detection to monitor game UI and send keyboard inputs based on detected states.
 
-**⚠️ Use standalone scripts only**:
-- **Standalone** (working): `meiko_v2.ahk`, `tiraq.ahk` - Fully functional
-- **Framework-based** (broken): Do NOT use - non-functional, requires complete rework
-
 ## Quick Start
 
 1. Install [AutoHotkey v2.0+](https://www.autohotkey.com/)
@@ -18,9 +14,7 @@ AutoHotkey v2 scripts for automating combat rotations in Fellowship. Scripts use
 4. Calibrate pixel coordinates for your system
 5. Run the script
 
-**For detailed setup and configuration**, see:
-- `CLAUDE.md` - Technical architecture and development guide
-- ⚠️ `Framework/` - Non-functional, requires architectural rework
+**For detailed setup and configuration**, see `CLAUDE.md` for technical architecture and development guide.
 
 ## Requirements
 
@@ -34,36 +28,27 @@ AutoHotkey v2 scripts for automating combat rotations in Fellowship. Scripts use
 
 ## Available Scripts
 
-### Meiko
+### Meiko (meiko_framework.ahk)
+- Event-driven framework architecture
 - Combo automation with ability sequences
-- Automatic finisher detection
+- Automatic finisher detection (post-combo callback pattern)
 - Chat input protection
+- **Controls:**
+  - **Alt+F1** - Toggle auto-combo on/off
+  - **3, !3, 1, !1, 2, !2** - Combo sequences (when enabled)
+  - **Enter** / **/** - Opens chat (pauses automation)
+  - **Escape** - Cancel chat
+  - **F10** - Exit script
 
-### Tiraq
+### Tiraq (tiraq.ahk)
 - Swing timer automation
 - Thunder Call cooldown tracking
+- **Controls:**
+  - **F1** - Toggle automation on/off
+  - **F10** - Exit script
 
-## Basic Controls
-
-Most scripts use:
-- **F1** - Toggle automation on/off
-- **F10** - Exit script
-- **Enter** - Opens chat (pauses automation)
-- **Escape** - Cancel chat
-
-<<<<<<< HEAD
-See individual script files or documentation for specific controls.
-=======
-**Meiko v2 Chat Protection:**
-- **Enter** or **/** - Toggle chat mode (automatic, transparent passthrough)
-
-## Configurations
-
-Note: AutoHotKey 2.0+ required
-
-### Display Settings
+## Display Settings
 
 **Resolution:** 2560x1440
-**Window:** Borderless
-**Resolution Scale:** 100
->>>>>>> ade39209d68d7c805a9534164dd605e5fa9221fa
+**Window Mode:** Borderless
+**Resolution Scale:** 100%
