@@ -1,10 +1,9 @@
 # Fellowship Rotation Scripts
-
-**⚠️ DISCLAIMER**: These scripts automate game inputs and violate Fellowship's Terms of Service. For educational/research purposes only. Use at your own risk.
+These scripts automate game inputs and violate Fellowship's Terms of Service. For educational/research purposes only. Use at your own risk.
 
 ## Overview
 
-AutoHotkey v2 scripts for automating combat rotations in Fellowship. Scripts use pixel detection to monitor game UI and send keyboard inputs based on detected states.
+AutoHotkey v2 scripts for Fellowship.
 
 ## Quick Start
 
@@ -13,8 +12,6 @@ AutoHotkey v2 scripts for automating combat rotations in Fellowship. Scripts use
 3. Choose a character script from `Characters/` folder
 4. Calibrate pixel coordinates for your system
 5. Run the script
-
-**For detailed setup and configuration**, see `CLAUDE.md` for technical architecture and development guide.
 
 ## Requirements
 
