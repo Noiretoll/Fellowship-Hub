@@ -7,7 +7,7 @@
 ;          a finisher action after sequence completes (e.g., Meiko finisher after 2-step combo)
 
 #Requires AutoHotkey v2.0
-#Include ..\BaseEngine.ahk
+#Include BaseEngine.ahk
 
 class SequenceEngine extends BaseEngine {
     ; Configuration properties

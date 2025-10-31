@@ -4,7 +4,7 @@
 ;
 ; Purpose: Generic pixel polling engine that emits events when pixel conditions are met
 ; Events Emitted:
-;   - "PixelConditionMet" {target, color, x, y} - When pixel matches target color
+;   - "PixelStateChanged" {name, active, color, x, y} - When pixel state changes
 ;   - "WindowActive" - When game window gains focus
 ;   - "WindowInactive" - When game window loses focus
 ;
@@ -147,15 +147,14 @@ class PixelMonitor extends BaseEngine {
         if isMatch != previousState {
             this.SetState(stateKey, isMatch)
 
-            ; Emit event when pixel condition is met (transition to true)
-            if isMatch {
-                this.EmitEvent("PixelConditionMet", {
-                    target: targetName,
-                    color: currentColor,
-                    x: target["x"],
-                    y: target["y"]
-                })
-            }
+            ; Emit event when pixel state changes
+            this.EmitEvent("PixelStateChanged", {
+                name: targetName,
+                active: isMatch,
+                color: currentColor,
+                x: target["x"],
+                y: target["y"]
+            })
         }
     }
 
