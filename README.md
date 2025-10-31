@@ -1,19 +1,17 @@
 # Fellowship Rotation Scripts
-
-**⚠️ DISCLAIMER**: These scripts automate game inputs and violate Fellowship's Terms of Service. For educational/research purposes only. Use at your own risk.
+These scripts automate game inputs and violate Fellowship's Terms of Service. For educational/research purposes only. Use at your own risk.
 
 ## Overview
 
-AutoHotkey v2 scripts for automating combat rotations in Fellowship. Scripts use pixel detection to monitor game UI and send keyboard inputs based on detected states.
+AutoHotkey v2 scripts for Fellowship.
 
 ## Quick Start
 
 1. Install [AutoHotkey v2.0+](https://www.autohotkey.com/)
-2. Choose a character script from `Characters/` folder
-3. Calibrate pixel coordinates for your system
-4. Run the script
-
-**For detailed setup and configuration**, see `CLAUDE.md` for technical architecture and development guide.
+2. Configure game to 2560x1440 borderless windowed mode at 100% resolution scale
+3. Choose a character script from `Characters/` folder
+4. Follow instructions at the beginning of the character script
+5. Run the script
 
 ## Requirements
 
@@ -26,13 +24,17 @@ AutoHotkey v2 scripts for automating combat rotations in Fellowship. Scripts use
 
 ## Available Scripts
 
-### Meiko (meiko_framework.ahk)
+### Meiko
 
+- **Meiko_AutoCombo.ahk** - Auto-combo with hard-coded finisher
+- **Meiko_AutoFinisher.ahk** - Pixel-driven finisher only
 - Event-driven framework architecture
-- Combo automation with ability sequences
-- Automatic finisher detection (post-combo callback pattern)
 - Chat input protection
--
+
+### Rime (rime_framework.ahk)
+
+- Simple key sequences
+- No pixel monitoring or finishers
 
 ### Tiraq (tiraq.ahk)
 
