@@ -1,7 +1,7 @@
 # Framework System Design
 
-**Version:** 1.0
-**Date:** 2025-10-26
+**Version:** 1.1
+**Date:** 2025-10-29
 **Status:** Production-ready
 
 ---
@@ -56,6 +56,7 @@ No direct communication between components - all interaction via EventBus events
 **State Storage:**
 
 All state stored in `bus.state` Map:
+
 - `windowActive` - Game window focus state
 - `chatActive` - Chat mode active/inactive
 - `pixel_{name}` - Pixel detection states (set by PixelMonitor)
@@ -201,9 +202,105 @@ dispatcher := HotkeyDispatcher(
 
 ---
 
+### DebugMonitor
+
+**File:** `Framework/DebugMonitor.ahk`
+
+**Purpose:** Optional debugging and event logging system for development and troubleshooting.
+
+**Key Features:**
+
+- **Multi-Mode Output:** Tooltip overlay, file logging, or both
+- **Event Filtering:** Automatically monitors common framework events
+- **Real-Time Display:** Shows last N events in tooltip (configurable)
+- **Timestamped Logs:** Creates dated log files in `/Logs` directory
+- **Zero Impact:** Completely optional - scripts work without it
+
+**Output Modes:**
+
+- `"tooltip"` - Shows recent events in screen overlay (top-left corner)
+- `"file"` - Logs all events to timestamped file (`Logs/debug_YYYYMMDD_HHMMSS.log`)
+- `"both"` - Tooltip + file logging
+
+**Monitored Events:**
+
+- `HotkeyPressed` - When registered hotkeys are pressed
+- `PixelStateChanged` - When pixel conditions change
+- `FinisherExecuted` - When finishers fire
+- `SequenceStarted/Complete` - When combos execute
+- `WindowActive/Inactive` - When game window focus changes
+- `StateChanged` - When important state changes (chat, window, pixels)
+
+**Usage:**
+
+```ahk
+; Add to character script __New()
+#Include ..\Framework\DebugMonitor.ahk
+
+class MyCharacter {
+    debugMonitor := ""
+
+    __New() {
+        this.bus := EventBus()
+
+        ; Create debug monitor (optional)
+        this.debugMonitor := DebugMonitor(
+            this.bus,
+            "tooltip",  ; or "file" or "both"
+            5           ; Show last 5 events in tooltip
+        )
+
+        ; ... rest of setup ...
+    }
+
+    Start() {
+        ; Start debug monitor
+        if IsObject(this.debugMonitor) {
+            this.debugMonitor.Start()
+        }
+
+        ; ... rest of startup ...
+    }
+}
+```
+
+**Example Tooltip Output:**
+
+```
+=== DebugMonitor ===
+[14:23:45] Hotkey: Combo3 (key=3)
+[14:23:45] Sequence: Started (engine=MeikoCombo3, steps=2)
+[14:23:46] Sequence: Complete (engine=MeikoCombo3, steps=2)
+[14:23:47] Finisher: Executed (mode=auto-combo)
+[14:23:50] State: chatActive (old=false, new=true)
+```
+
+**Example Log File:**
+
+```
+=== DebugMonitor Log Started ===
+Timestamp: 2025-10-29 14:23:40
+Script: Meiko_AutoCombo.ahk
+=====================================
+
+[14:23:45] Hotkey: Combo3 (key=3)
+[14:23:45] Sequence: Started (engine=MeikoCombo3, steps=2)
+[14:23:46] Sequence: Complete (engine=MeikoCombo3, steps=2)
+[14:23:47] Finisher: Executed (mode=auto-combo)
+```
+
+**Recommendation:**
+
+- Use `"tooltip"` during active development for real-time feedback
+- Use `"file"` for long-running tests or bug reproduction
+- Use `"both"` for comprehensive debugging sessions
+- Remove or comment out in production for performance
+
+---
+
 ### SequenceEngine
 
-**File:** `Framework/Engines/SequenceEngine.ahk`
+**File:** `Framework/SequenceEngine.ahk`
 
 **Purpose:** Execute multi-step combo sequences with optional post-completion callback.
 
@@ -244,18 +341,12 @@ engine := SequenceEngine(
 4. Call `finisherCallback()` if provided
 5. Emit `SequenceComplete` event
 
-**CRITICAL - Finisher Pattern:**
-
-- Finisher is NOT an independent engine
-- Finisher fires AFTER combo completes, not during
-- Finisher callback checks pixel state: `bus.GetState("pixel_Finisher")`
-- If finisher ready → send finisher key → emit `FinisherExecuted`
-
 **Finisher Modes:**
 
 Character scripts may implement two independent finisher modes:
 
 1. **Auto-Combo Mode (includes finisher):**
+
    - Executes combo sequences automatically
    - Fires finisher 200ms after each combo completes
    - Toggle: Alt+F1 (default)
@@ -276,27 +367,15 @@ Character scripts may implement two independent finisher modes:
 
 ---
 
-### PriorityEngine
-
-**File:** `Framework/Engines/PriorityEngine.ahk`
-
-**Purpose:** Priority-based rotation engine with cooldown tracking (future use for Tiraq script).
-
-**Status:** ⚠️ Implemented but not yet used by any character scripts.
-
-**Future Use:** Tiraq character script (swing timer, Thunder Call automation).
-
----
-
 ## Architecture Patterns
 
 ### Two-Layer Pattern
 
 **Layer 1: Framework (Generic Building Blocks)**
 
-- **Location:** `Framework/`, `Framework/Engines/`
+- **Location:** `Framework/`
 - **Purpose:** Reusable engines for ANY character
-- **Contains:** Generic patterns (sequences, pixel monitoring, priority rotation)
+- **Contains:** Generic patterns (sequences, pixel monitoring, hotkey dispatch, debugging)
 - **NO character assumptions:** No hardcoded delays, keys, positions, or modes
 
 **Layer 2: Character Scripts (Character-Specific Logic)**
@@ -895,6 +974,7 @@ Hotkey("F1", this.Toggle.Bind(this))
 **Test Files:**
 
 1. **Integration_Test_Meiko.ahk** - 15 tests
+
    - EventBus pub/sub
    - PixelMonitor state detection
    - SequenceEngine combo execution
@@ -959,8 +1039,10 @@ See individual test files for manual test procedures.
 
 **Character Scripts:**
 
-- ✅ Meiko (6 combos, finisher integration, chat protection)
-- ⏳ Tiraq (future - priority rotation with PriorityEngine)
+- ✅ Meiko_AutoCombo (6 combos with hard-coded finisher, chat protection)
+- ✅ Meiko_AutoFinisher (pixel-driven finisher only, chat protection)
+- ✅ Rime (simple key sequences, no pixel monitoring or finishers)
+- ⏸️ Tiraq (standalone script - does NOT use framework)
 
 **Test Types:**
 
@@ -976,17 +1058,18 @@ See individual test files for manual test procedures.
 ```
 Fellowship-Hub/
 ├── Characters/
-│   ├── meiko_framework.ahk         # Event-driven Meiko (production)
-│   └── tiraq.ahk                   # Standalone Tiraq
+│   ├── Meiko_AutoCombo.ahk         # Meiko auto-combo with hard-coded finisher
+│   ├── Meiko_AutoFinisher.ahk      # Meiko pixel-driven finisher only
+│   ├── rime_framework.ahk          # Rime simple key sequences
+│   └── tiraq.ahk                   # Standalone Tiraq (no framework)
 │
 ├── Framework/
 │   ├── EventBus.ahk                # Central event hub
 │   ├── BaseEngine.ahk              # Engine base class
 │   ├── PixelMonitor.ahk            # Pixel detection
 │   ├── HotkeyDispatcher.ahk        # Hotkey registration
-│   ├── Engines/
-│   │   ├── SequenceEngine.ahk      # Combo sequences + finisher
-│   │   └── PriorityEngine.ahk      # Priority rotation (future)
+│   ├── SequenceEngine.ahk          # Combo sequences + finisher
+│   ├── DebugMonitor.ahk            # Optional debugging/logging (optional)
 │   ├── Tests/
 │   │   ├── Integration_Test_Meiko.ahk           # 15 integration tests
 │   │   ├── Integration_Test_Meiko_Finisher.ahk  # 10 finisher tests
@@ -1000,7 +1083,23 @@ Fellowship-Hub/
 
 ## Version History
 
+**1.2** (2025-10-29)
+
+- Added DebugMonitor.ahk - Optional debugging and event logging system
+- Fixed critical bug: PixelMonitor event name mismatch (PixelConditionMet → PixelStateChanged)
+- Removed unused PriorityEngine.ahk (268 lines of dead code)
+- Updated documentation to reflect actual script architecture (added rime_framework.ahk, corrected tiraq.ahk status)
+
+**1.1** (2025-10-29)
+
+- Split meiko_framework.ahk into two focused scripts:
+  - Meiko_AutoCombo.ahk: Auto-combo with hard-coded finisher (no pixel detection)
+  - Meiko_AutoFinisher.ahk: Pixel-driven finisher only (no combo logic)
+- User-friendly configuration sections in both scripts
+- Ability keybinds defined once and referenced in combo sequences
+
 **1.0** (2025-10-26)
+
 - Initial system design document
 - Event-driven architecture (Phase 1-8 complete)
 - Finisher integration pattern documented

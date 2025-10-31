@@ -1,24 +1,9 @@
-; meiko_framework.ahk
-; Meiko character script using event-driven framework architecture
-; Implements two-layer pattern: Character-specific configuration + Generic framework engines
-;
-; Architecture: Event-Driven (Post-Phase 8 + Finisher Integration)
-; - EventBus: Central event hub for all communication
-; - PixelMonitor: Detects finisher availability via pixel detection
-; - SequenceEngine: Executes combo sequences with integrated finisher callback
-; - HotkeyDispatcher: Registers combo hotkeys and emits events
-;
-; Finisher Pattern:
-; - Finisher is NOT an independent engine
-; - After each combo completes (2nd key pressed), wait 10ms
-; - Check pixel state, if finisher ready -> send finisher key
-; - Finisher only fires AFTER combo completion, not during
+; Meiko_AutoCombo.ahk
+; Meiko auto-combo script with hard-coded finisher integration
+; Fires finisher automatically 200ms after each combo completes (no pixel detection)
 ;
 ; Controls:
-;   Alt+F1   - Toggle auto-combo ON/OFF (default: OFF, includes finisher)
-;   3, !3, 1, !1, 2, !2 - Combo sequences (when auto-combo enabled)
-;   Enter, / - Open chat (pauses all automation)
-;   Escape   - Cancel chat (resumes automation)
+;   Alt+F1   - Toggle auto-combo ON/OFF (default: OFF)
 ;   F10      - Exit script
 
 #Requires AutoHotkey v2.0
@@ -27,26 +12,51 @@ Persistent
 SetWinDelay -1
 CoordMode "Pixel", "Screen"
 
+; ========================================
+; CONFIGURATION - MATCH YOUR GAME KEYBINDS
+; ========================================
+; Hotkey syntax: "3" = key 3, "!3" = Alt+3, "^3" = Ctrl+3, "+3" = Shift+3
+
+; ABILITY KEYBINDS (configure once to match in-game keybinds)
+global CFG_EARTHEN_PUNCH_KEY := "1"      ; Earthen Punch ability keybind
+global CFG_WIND_KICK_KEY := "2"          ; Wind Kick ability keybind
+global CFG_SPIRIT_FIST_KEY := "3"        ; Spirit Fist ability keybind
+global CFG_FINISHER_KEY := "``"          ; Finisher keybind (backtick default)
+
+; COMBO HOTKEYS (press these keys to trigger combo sequences)
+global CFG_EARTH_DAMAGE_HOTKEY := "1"    ; Earth Damage Combo: Earthen Punch → Wind Kick → Finisher
+global CFG_EARTH_BUFF_HOTKEY := "!1"     ; Earth Buff Combo: Earthen Punch → Spirit Fist → Finisher
+global CFG_WIND_DAMAGE_HOTKEY := "2"     ; Wind Damage Combo: Wind Kick → Earthen Punch → Finisher
+global CFG_WIND_BUFF_HOTKEY := "!2"      ; Wind Buff Combo: Wind Kick → Spirit Fist → Finisher
+global CFG_SPIRIT_BUFF1_HOTKEY := "3"    ; Spirit Buff 1 Combo: Spirit Fist → Earthen Punch → Finisher
+global CFG_SPIRIT_BUFF2_HOTKEY := "!3"   ; Spirit Buff 2 Combo: Spirit Fist → Wind Kick → Finisher
+
+; ========================================
+; END CONFIGURATION
+; ========================================
+
+; Script constants (do not modify)
+global CFG_GCD_DELAY := 1050             ; Global cooldown delay between combo steps (ms)
+global CFG_FINISHER_DELAY := 200        ; Delay after combo before finisher fires (ms)
+
 ; Include framework components
 #Include ..\Framework\EventBus.ahk
 #Include ..\Framework\BaseEngine.ahk
-#Include ..\Framework\PixelMonitor.ahk
+#Include ..\Framework\SequenceEngine.ahk
 #Include ..\Framework\HotkeyDispatcher.ahk
-#Include ..\Framework\Engines\SequenceEngine.ahk
 
-; ===== MEIKO CHARACTER CONFIGURATION =====
-class MeikoCharacter {
+; ===== MEIKO AUTO-COMBO CLASS =====
+class MeikoAutoCombo {
     ; Framework components
     bus := ""
-    pixelMonitor := ""
     hotkeyDispatcher := ""
     comboEngines := Map()  ; Map of combo name -> SequenceEngine (with finisher callbacks)
 
-    ; Configuration
+    ; Configuration (loaded from global CFG_* variables at top of script)
     gameProcess := "fellowship-Win64-Shipping.exe"
-    gcdDelay := 1050       ; Global cooldown delay between combo steps
-    finisherDelay := 200   ; Delay after combo completion before finisher check/execution
-    finisherKey := "``"    ; Finisher keybind (backtick)
+    gcdDelay := CFG_GCD_DELAY
+    finisherDelay := CFG_FINISHER_DELAY
+    finisherKey := CFG_FINISHER_KEY
 
     ; State flags
     autoComboEnabled := false ; Auto-combo disabled by default
@@ -67,7 +77,6 @@ class MeikoCharacter {
         this.bus.SetState("chatActive", false)
 
         ; Setup components
-        this._SetupPixelMonitor()
         this._SetupComboEngines()  ; Now includes finisher callback integration
         this._SetupComboHotkeys()
         this._SetupChatProtection()
@@ -77,67 +86,25 @@ class MeikoCharacter {
         this.bus.Subscribe("HotkeyPressed", this.HandleComboHotkey.Bind(this))
     }
 
-    ; ===== PIXEL MONITOR SETUP =====
-    _SetupPixelMonitor() {
-        ; Define pixel targets to monitor
-        pixelTargets := Map()
-
-        ; Finisher pixel target (inverted - looks for NOT inactive color)
-        pixelTargets["Finisher"] := Map(
-            "x", 1205,
-            "y", 1119,
-            "activeColor", 0xFFFFFF,  ; Bright/lit up color
-            "tolerance", 10,
-            "invert", true  ; Invert logic: true when NOT matching inactive color
-        )
-
-        ; Create PixelMonitor with configured targets
-        this.pixelMonitor := PixelMonitor(
-            this.bus,
-            pixelTargets,
-            this.gameProcess,
-            50  ; Poll interval: 50ms
-        )
-    }
-
     ; ===== COMBO ENGINE SETUP =====
     _SetupComboEngines() {
-        ; Define all combo sequences
+        ; Define all combo sequences using ability keybinds
         ; Format: [{key: "1", delay: 1050}, {key: "2", delay: 0}]
         ; delay = milliseconds to wait AFTER sending key (GCD delay)
 
         combos := Map(
-            "Combo3", [
-                {key: "3", delay: this.gcdDelay},  ; Send 3, wait GCD
-                {key: "1", delay: 0}                ; Send 1, no delay after
-            ],
-            "Combo3Alt", [
-                {key: "3", delay: this.gcdDelay},
-                {key: "2", delay: 0}
-            ],
-            "Combo1", [
-                {key: "1", delay: this.gcdDelay},
-                {key: "2", delay: 0}
-            ],
-            "Combo1Alt", [
-                {key: "1", delay: this.gcdDelay},
-                {key: "3", delay: 0}
-            ],
-            "Combo2", [
-                {key: "2", delay: this.gcdDelay},
-                {key: "1", delay: 0}
-            ],
-            "Combo2Alt", [
-                {key: "2", delay: this.gcdDelay},
-                {key: "3", delay: 0}
-            ]
+            "EarthDamageCombo", [{ key: CFG_EARTHEN_PUNCH_KEY, delay: this.gcdDelay }, { key: CFG_WIND_KICK_KEY, delay: 0 }],
+            "EarthBuffCombo", [{ key: CFG_EARTHEN_PUNCH_KEY, delay: this.gcdDelay }, { key: CFG_SPIRIT_FIST_KEY, delay: 0 }],
+            "WindDamageCombo", [{ key: CFG_WIND_KICK_KEY, delay: this.gcdDelay }, { key: CFG_EARTHEN_PUNCH_KEY, delay: 0 }],
+            "WindBuffCombo", [{ key: CFG_WIND_KICK_KEY, delay: this.gcdDelay }, { key: CFG_SPIRIT_FIST_KEY, delay: 0 }],
+            "SpiritBuff1Combo", [{ key: CFG_SPIRIT_FIST_KEY, delay: this.gcdDelay }, { key: CFG_EARTHEN_PUNCH_KEY,
+                delay: 0 }],
+            "SpiritBuff2Combo", [{ key: CFG_SPIRIT_FIST_KEY, delay: this.gcdDelay }, { key: CFG_WIND_KICK_KEY, delay: 0 }]
         )
-
         ; Create finisher callback function
-        ; This will be called 10ms after each combo completes
-        ; Checks pixel state and sends finisher key if ready
-        finisherCallback := this.CheckAndExecuteFinisher.Bind(this)
-
+        ; This will be called 200ms after each combo completes
+        ; Unconditionally sends finisher key (no pixel check)
+        finisherCallback := this.ExecuteFinisher.Bind(this)
         ; Create SequenceEngine for each combo with finisher callback
         for comboName, steps in combos {
             engine := SequenceEngine(
@@ -145,7 +112,7 @@ class MeikoCharacter {
                 "Meiko" . comboName,  ; Unique engine name
                 steps,                 ; Combo sequence steps
                 finisherCallback,      ; Finisher callback (called after completion)
-                this.finisherDelay     ; 10ms delay before finisher check
+                this.finisherDelay     ; 200ms delay before finisher execution
             )
             this.comboEngines[comboName] := engine
         }
@@ -153,33 +120,29 @@ class MeikoCharacter {
 
     ; ===== FINISHER CALLBACK =====
     ; Called 200ms after each combo completes
-    ; Checks pixel condition and executes finisher if ready
-    CheckAndExecuteFinisher() {
-        ; Check if finisher pixel is ready (state set by PixelMonitor)
-        if !this.bus.GetState("pixel_Finisher", false) {
-            return  ; Finisher not ready, do nothing
-        }
-
-        ; Finisher is ready - send finisher key
+    ; Unconditionally executes finisher (no pixel check)
+    ExecuteFinisher() {
+        ; Send finisher key unconditionally
         Send this.finisherKey
 
         ; Emit event for tracking/debugging
         this.bus.Emit("FinisherExecuted", {
-            timestamp: A_TickCount
+            timestamp: A_TickCount,
+            mode: "auto-combo"
         })
     }
 
     ; ===== COMBO HOTKEY SETUP =====
     _SetupComboHotkeys() {
-        ; Map hotkeys to combo names
+        ; Map hotkeys from CFG_* variables to combo names
         ; $ prefix prevents hotkey from triggering itself when Send is used
         hotkeyMap := Map(
-            "$3", "Combo3",
-            "$!3", "Combo3Alt",
-            "$1", "Combo1",
-            "$!1", "Combo1Alt",
-            "$2", "Combo2",
-            "$!2", "Combo2Alt"
+            "$" . CFG_EARTH_DAMAGE_HOTKEY, "EarthDamageCombo",
+            "$" . CFG_EARTH_BUFF_HOTKEY, "EarthBuffCombo",
+            "$" . CFG_WIND_DAMAGE_HOTKEY, "WindDamageCombo",
+            "$" . CFG_WIND_BUFF_HOTKEY, "WindBuffCombo",
+            "$" . CFG_SPIRIT_BUFF1_HOTKEY, "SpiritBuff1Combo",
+            "$" . CFG_SPIRIT_BUFF2_HOTKEY, "SpiritBuff2Combo"
         )
 
         ; Create HotkeyDispatcher to register hotkeys
@@ -219,9 +182,6 @@ class MeikoCharacter {
 
     ; ===== START ALL SYSTEMS =====
     Start() {
-        ; Start pixel monitoring (monitors finisher pixel state)
-        this.pixelMonitor.Start()
-
         ; Start combo engines (always on, but only execute when hotkey pressed)
         ; Each engine has finisher callback integrated
         for comboName, engine in this.comboEngines {
@@ -230,7 +190,7 @@ class MeikoCharacter {
 
         ; Hotkey dispatcher starts when auto-combo is enabled (toggled with Alt+F1)
 
-        ToolTip "Meiko Script Started`nAlt+F1: Toggle Auto-Combo | F10: Exit"
+        ToolTip "Meiko Auto-Combo Started`nAlt+F1: Toggle Auto-Combo | F10: Exit"
         SetTimer () => ToolTip(), -3000
     }
 
@@ -268,7 +228,7 @@ class MeikoCharacter {
 
         if this.autoComboEnabled {
             this.hotkeyDispatcher.Start()
-            ToolTip "Auto-Combo: ON"
+            ToolTip "Auto-Combo: ON (includes finisher)"
         } else {
             this.hotkeyDispatcher.Stop()
             ToolTip "Auto-Combo: OFF"
@@ -310,14 +270,10 @@ class MeikoCharacter {
 
     ; ===== CLEANUP =====
     Cleanup() {
-        ToolTip "Shutting down Meiko script..."
+        ToolTip "Shutting down Meiko Auto-Combo..."
         SetTimer () => ToolTip(), -1000
 
         ; Stop all engines
-        if IsObject(this.pixelMonitor) {
-            this.pixelMonitor.Stop()
-        }
-
         for comboName, engine in this.comboEngines {
             engine.Stop()
         }
@@ -353,8 +309,8 @@ class MeikoCharacter {
 }
 
 ; ===== INITIALIZE AND START =====
-global meiko := MeikoCharacter()
-meiko.Start()
+global meikoCombo := MeikoAutoCombo()
+meikoCombo.Start()
 
 ; Keep script running
 return
